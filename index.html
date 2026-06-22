@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>氣象地圖視覺化儀表板</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Sans TC';
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+            background-color: #f0f4f8;
+        }
+
+        /* 導覽列樣式 */
+        nav {
+            background-color: #005088;
+            padding: 12px 24px;
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            z-index: 10;
+            overflow-x: auto;
+            /* 隱藏捲軸但保持可滑動 */
+            scrollbar-width: none; /* Firefox */
+            -ms-overflow-style: none;  /* Internet Explorer 10+ */
+        }
+        
+        nav::-webkit-scrollbar { 
+            display: none; /* WebKit */
+        }
+
+        /* 品牌/標題區 */
+        .brand {
+            color: white;
+            font-size: 18px;
+            font-weight: bold;
+            margin-right: auto;
+            white-space: nowrap;
+            letter-spacing: 1px;
+        }
+
+        /* 按鈕樣式 */
+        .nav-btn {
+            background: transparent;
+            color: rgba(255, 255, 255, 0.8);
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 15px;
+            font-weight: 600;
+            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+            white-space: nowrap;
+            position: relative;
+        }
+
+        .nav-btn:hover {
+            color: #ffffff;
+            background-color: rgba(255, 255, 255, 0.15);
+        }
+
+        /* Active 狀態 */
+        .nav-btn.active {
+            background-color: #11caa0;
+            color: #ffffff;
+            box-shadow: 0 4px 12px rgba(17, 202, 160, 0.4);
+            transform: translateY(-2px);
+        }
+        
+        /* iframe 容器 */
+        main {
+            flex: 1;
+            position: relative;
+            background-color: #ffffff;
+        }
+
+        iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+            position: absolute;
+            top: 0;
+            left: 0;
+            transition: opacity 0.3s ease;
+        }
+        
+        /* 載入動畫遮罩 */
+        .loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: rgba(255,255,255,0.7);
+            z-index: 5;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        
+        .loading-overlay.active {
+            opacity: 1;
+        }
+        
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #e0e0e0;
+            border-top: 4px solid #005088;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+
+    <nav id="navbar">
+        <div class="brand">氣象動態地圖</div>
+        <button class="nav-btn active" data-src="逐月動圖.html">總覽</button>
+        <button class="nav-btn" data-src="1月動圖.html">1月</button>
+        <button class="nav-btn" data-src="2月動圖.html">2月</button>
+        <button class="nav-btn" data-src="3月動圖.html">3月</button>
+        <button class="nav-btn" data-src="4月動圖.html">4月</button>
+        <button class="nav-btn" data-src="5月動圖.html">5月</button>
+        <button class="nav-btn" data-src="6月動圖.html">6月</button>
+        <button class="nav-btn" data-src="7月動圖.html">7月</button>
+        <button class="nav-btn" data-src="8月動圖.html">8月</button>
+        <button class="nav-btn" data-src="9月動圖.html">9月</button>
+        <button class="nav-btn" data-src="10月動圖.html">10月</button>
+        <button class="nav-btn" data-src="11月動圖.html">11月</button>
+        <button class="nav-btn" data-src="12月動圖.html">12月</button>
+    </nav>
+
+    <main>
+        <div class="loading-overlay" id="loading">
+            <div class="spinner"></div>
+        </div>
+        <iframe id="map-frame" src="逐月動圖.html" title="氣象地圖展示區"></iframe>
+    </main>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const buttons = document.querySelectorAll('.nav-btn');
+            const iframe = document.getElementById('map-frame');
+            const loading = document.getElementById('loading');
+            
+            // 處理按鈕點擊
+            buttons.forEach(button => {
+                button.addEventListener('click', function() {
+                    // 移除所有按鈕的 active 狀態
+                    buttons.forEach(btn => btn.classList.remove('active'));
+                    
+                    // 添加當前點擊按鈕的 active 狀態
+                    this.classList.add('active');
+                    
+                    // 獲取要載入的檔案路徑
+                    const newSrc = this.getAttribute('data-src');
+                    
+                    // 如果路徑與當前不同，則切換 iframe 來源並顯示載入動畫
+                    if (iframe.getAttribute('src') !== newSrc) {
+                        loading.classList.add('active');
+                        iframe.style.opacity = '0.3';
+                        
+                        iframe.src = newSrc;
+                    }
+                });
+            });
+            
+            // iframe 載入完成時隱藏載入動畫
+            iframe.addEventListener('load', () => {
+                loading.classList.remove('active');
+                iframe.style.opacity = '1';
+            });
+        });
+    </script>
+</body>
+</html>
